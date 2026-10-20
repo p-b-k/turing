@@ -1,0 +1,19 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Lambda Calculus Term
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+use std::str::FromStr;
+
+pub enum Term {
+    Var(String),
+    Abs(String, Box<Term>),
+    Appl(Box<Term>, Box<Term>)
+}
+
+impl FromStr for Term {
+    type Err = String;
+    
+    fn from_str(_s: &str) -> Result<Self, Self::Err> {
+        Err(format!("{}::{} Not Implemented", "FromStr", "from_str"))
+    }
+}

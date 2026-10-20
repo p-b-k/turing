@@ -8,3 +8,4 @@ pub mod pretty_engine;
 pub mod sym_machine;
 pub mod tape;
 pub mod tm_parser;
+pub mod lambda;
