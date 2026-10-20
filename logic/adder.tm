@@ -1,4 +1,7 @@
+# Addition (base-1) algorithm
 [0, 1]
+
+# States
 
 q0
 { 1 > q0 _
@@ -14,7 +17,7 @@ q2
 { 1 < q3
 }
 
-q3
+#q3
 { 1 < _
 , > q4
 }

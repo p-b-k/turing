@@ -86,6 +86,12 @@ Definition is_p_plus (u v : U) := is_n_plus v u.
 
 (* SKIP AFTER THIS POINT     **************************************************************************************** * 
 
+Theorem n_star_trans : forall u v w : U, is_n_star u v /\ is_n_star v w -> is_n_star u w.
+Proof.
+ intros u v w H; destruct H as [H1 H2].
+ induction H1; induction H2.
+Qed.
+
 (* Properties of n_plus and p_plus *)
 Parameter n_plus_trans : forall u v w : U, is_n_plus u v /\ is_n_plus v w -> is_n_plus u w.
 Parameter n_plus_inv : forall u v : U, is_n_plus u v -> is_p_plus v u.
