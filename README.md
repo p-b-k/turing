@@ -6,9 +6,9 @@ This is basically just a project to write a turing machine and use it go to thro
 
 Building
 ------------------------------------------------
-Standard rust build from root
-`$ cargo build`
-puts the built files in target/debug
+Standard rust build from root  
+`$ cargo build`  
+puts the built files in target/debug  
 
 Running
 ------------------------------------------------
