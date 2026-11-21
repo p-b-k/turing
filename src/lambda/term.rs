@@ -61,10 +61,12 @@ impl Term {
 }
 
 fn parse_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
+    // debug!("{:20}: Calling", "parse_term");
     let mut term: Option<Box<Term>> = Option::None;
 
     loop {
         let next_token = tstream.next();
+        // debug!("{:20}: next = {next_token:?}", "parse_term");
 
         match next_token {
             Option::None => break,
@@ -73,7 +75,8 @@ fn parse_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                     bail!("parse error, unexpected '.'");
                 }
                 Token::Lambda => {
-                    let abs = parse_abs(&mut tstream)?;
+                    let abs = parse_abs(&mut tstream, true)?;
+                    // debug!( "{:20}: parse_sub_term, parse_abs returned {:?}", "parse_term", abs );
 
                     if let Option::Some(old_term) = term {
                         term = Some(Box::new(Term::Appl(old_term, abs)));
@@ -112,17 +115,46 @@ fn parse_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
     }
 }
 
-fn parse_abs(_tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
-    // TODO
-    bail!("parse_abs not implemented")
+fn parse_abs(tstream: &mut Iter<'_, Token>, top: bool) -> Result<Box<Term>> {
+    // debug!("{:20}: Calling, top = {top}", "parse_abs");
+
+    let next = tstream.next();
+
+    match next {
+        Option::None => bail!("Abstraction missing variable"),
+        Option::Some(c) => {
+            if Option::Some(&Token::Dot) == tstream.next() {
+                let term = if top {
+                    // debug!( "{:20}: calling parse_term because top is {top}", "parse_abs" );
+                    parse_term(tstream)
+                } else {
+                    // debug!( "{:20}: calling parse_sub_term because top is {top}", "parse_abs" );
+                    parse_sub_term(tstream)
+                }?;
+
+                match c {
+                    Token::LChar(ch) => {
+                        // debug!( "{:20}: Returning, top = {top}, c = {ch:?}, term = {term:?}", "parse_abs" );
+                        Ok(Box::new(Term::Abs(*ch, term)))
+                    }
+                    _ => bail!("Expected lower case character"),
+                }
+            } else {
+                bail!("Expected dot")
+            }
+        }
+    }
 }
 
 fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
+    // debug!("{:20}: Calling", "parse_sub_term");
     let mut term: Option<Box<Term>> = Option::None;
 
     loop {
+        // debug!("{:20}: Top of loop", "parse_sub_term");
         let next_token = tstream.next();
 
+        // debug!("{:20}: next = {next_token:?}", "parse_sub_term");
         match next_token {
             Option::None => bail!("Unexpected end of input"),
             Option::Some(t) => match t {
@@ -130,13 +162,16 @@ fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                     bail!("parse error, unexpected '.'");
                 }
                 Token::Lambda => {
-                    let abs = parse_abs(&mut tstream)?;
+                    let abs = parse_abs(&mut tstream, false)?;
+                    // debug!("{:20}: parse_abs returned {:?}", "parse_sub_term", abs);
 
                     if let Option::Some(old_term) = term {
                         term = Some(Box::new(Term::Appl(old_term, abs)));
                     } else {
                         term = Some(abs);
                     }
+
+                    break;
                 }
                 Token::OParen => {
                     let sub_term = parse_sub_term(&mut tstream)?;
@@ -147,7 +182,10 @@ fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                         term = Some(sub_term);
                     }
                 }
-                Token::CParen => break,
+                Token::CParen => {
+                    // debug!( "{:20}: Close Parenthesis, expecting to close sub expression", "parse_sub_term" );
+                    break;
+                }
                 Token::LChar(c) => {
                     let var = Box::new(Term::Var(c.clone()));
 
@@ -159,17 +197,40 @@ fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                 }
             },
         }
+
+        // debug!("{:20}: End of loop", "parse_sub_term");
     }
 
     match term {
         Option::None => bail!("no sub-term read"),
-        Option::Some(t) => Ok(t),
+        Option::Some(t) => {
+            // debug!("{:20}: Returning {:?}", "parse_sub_term", t);
+            Ok(t)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_basic_test() {
+        // Simple variable
+        let input = "x";
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(Term::Var('x'), *term);
+
+        // Parenthesis get parsed out
+        let input = "(x)";
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(Term::Var('x'), *term);
+
+        // Extra parenthesis do nothing
+        let input = "((x))";
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(Term::Var('x'), *term);
+    }
 
     #[test]
     fn parse_appl_test() {
@@ -216,6 +277,35 @@ mod tests {
             *term
         );
 
+        let input = "((xy)z)";
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(
+            Term::Appl(
+                Box::new(Term::Appl(
+                    Box::new(Term::Var('x')),
+                    Box::new(Term::Var('y'))
+                )),
+                Box::new(Term::Var('z'))
+            ),
+            *term
+        );
+
+        let input = "((xy)z)y";
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(
+            Term::Appl(
+                Box::new(Term::Appl(
+                    Box::new(Term::Appl(
+                        Box::new(Term::Var('x')),
+                        Box::new(Term::Var('y'))
+                    )),
+                    Box::new(Term::Var('z'))
+                )),
+                Box::new(Term::Var('y'))
+            ),
+            *term
+        );
+
         let input = "x(yz)";
         let term = Term::parse(&input).unwrap();
         assert_eq!(
@@ -226,6 +316,44 @@ mod tests {
                     Box::new(Term::Var('z'))
                 ))
             ),
+            *term
+        );
+    }
+
+    #[test]
+    fn parse_abs_test() {
+        // let input = "\\x.y";
+        // let term = Term::parse(&input).unwrap();
+        // assert_eq!(Term::Abs('x', Box::new(Term::Var('y'))), *term);
+
+        // let input = "\\x.yz";
+        // let term = Term::parse(&input).unwrap();
+        // assert_eq!(
+        //     Term::Abs(
+        //         'x',
+        //         Box::new(Term::Appl(
+        //             Box::new(Term::Var('y')),
+        //             Box::new(Term::Var('z')),
+        //         ))
+        //     ),
+        //     *term
+        // );
+
+        eprintln!();
+        eprintln!("######## \\x.\\y.z");
+        let input = "\\x.\\y.z";
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(
+            Term::Abs('x', Box::new(Term::Abs('y', Box::new(Term::Var('z')),))),
+            *term
+        );
+
+        eprintln!();
+        eprintln!("######## \\x.(\\y.z)");
+        let input = "\\x.(\\y.z)";
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(
+            Term::Abs('x', Box::new(Term::Abs('y', Box::new(Term::Var('z')),))),
             *term
         );
     }
