@@ -210,6 +210,18 @@ fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
     }
 }
 
+pub fn mk_var(c: char) -> Box<Term> {
+    Box::new(Term::Var(c))
+}
+
+pub fn mk_abs(c: char, t: Box<Term>) -> Box<Term> {
+    Box::new(Term::Abs(c, t))
+}
+
+pub fn mk_appl(t1: Box<Term>, t2: Box<Term>) -> Box<Term> {
+    Box::new(Term::Appl(t1, t2))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,39 +231,30 @@ mod tests {
         // Simple variable
         let input = "x";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(Term::Var('x'), *term);
+        assert_eq!(mk_var('x'), term);
 
         // Parenthesis get parsed out
         let input = "(x)";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(Term::Var('x'), *term);
+        assert_eq!(mk_var('x'), term);
 
         // Extra parenthesis do nothing
         let input = "((x))";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(Term::Var('x'), *term);
+        assert_eq!(mk_var('x'), term);
     }
 
     #[test]
     fn parse_appl_test() {
         let input = "xy";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(
-            Term::Appl(Box::new(Term::Var('x')), Box::new(Term::Var('y'))),
-            *term
-        );
+        assert_eq!(mk_appl(mk_var('x'), mk_var('y')), term);
 
         let input = "xyz";
         let term = Term::parse(&input).unwrap();
         assert_eq!(
-            Term::Appl(
-                Box::new(Term::Appl(
-                    Box::new(Term::Var('x')),
-                    Box::new(Term::Var('y'))
-                )),
-                Box::new(Term::Var('z'))
-            ),
-            *term
+            mk_appl(mk_appl(mk_var('x'), mk_var('y')), mk_var('z')),
+            term
         );
     }
 
@@ -259,102 +262,60 @@ mod tests {
     fn parse_sub_term_test() {
         let input = "(xy)";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(
-            Term::Appl(Box::new(Term::Var('x')), Box::new(Term::Var('y'))),
-            *term
-        );
+        assert_eq!(mk_appl(mk_var('x'), mk_var('y')), term);
 
         let input = "(xy)z";
         let term = Term::parse(&input).unwrap();
         assert_eq!(
-            Term::Appl(
-                Box::new(Term::Appl(
-                    Box::new(Term::Var('x')),
-                    Box::new(Term::Var('y'))
-                )),
-                Box::new(Term::Var('z'))
-            ),
-            *term
+            mk_appl(mk_appl(mk_var('x'), mk_var('y')), mk_var('z')),
+            term
         );
 
         let input = "((xy)z)";
         let term = Term::parse(&input).unwrap();
         assert_eq!(
-            Term::Appl(
-                Box::new(Term::Appl(
-                    Box::new(Term::Var('x')),
-                    Box::new(Term::Var('y'))
-                )),
-                Box::new(Term::Var('z'))
-            ),
-            *term
+            mk_appl(mk_appl(mk_var('x'), mk_var('y')), mk_var('z')),
+            term
         );
 
         let input = "((xy)z)y";
         let term = Term::parse(&input).unwrap();
         assert_eq!(
-            Term::Appl(
-                Box::new(Term::Appl(
-                    Box::new(Term::Appl(
-                        Box::new(Term::Var('x')),
-                        Box::new(Term::Var('y'))
-                    )),
-                    Box::new(Term::Var('z'))
-                )),
-                Box::new(Term::Var('y'))
+            mk_appl(
+                mk_appl(mk_appl(mk_var('x'), mk_var('y')), mk_var('z')),
+                mk_var('y')
             ),
-            *term
+            term
         );
 
         let input = "x(yz)";
         let term = Term::parse(&input).unwrap();
         assert_eq!(
-            Term::Appl(
-                Box::new(Term::Var('x')),
-                Box::new(Term::Appl(
-                    Box::new(Term::Var('y')),
-                    Box::new(Term::Var('z'))
-                ))
-            ),
-            *term
+            mk_appl(mk_var('x'), mk_appl(mk_var('y'), mk_var('z'))),
+            term
         );
     }
 
     #[test]
     fn parse_abs_test() {
-        // let input = "\\x.y";
-        // let term = Term::parse(&input).unwrap();
-        // assert_eq!(Term::Abs('x', Box::new(Term::Var('y'))), *term);
+        let input = "\\x.y";
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(mk_abs('x', mk_var('y')), term);
 
-        // let input = "\\x.yz";
-        // let term = Term::parse(&input).unwrap();
-        // assert_eq!(
-        //     Term::Abs(
-        //         'x',
-        //         Box::new(Term::Appl(
-        //             Box::new(Term::Var('y')),
-        //             Box::new(Term::Var('z')),
-        //         ))
-        //     ),
-        //     *term
-        // );
+        let input = "\\x.yz";
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(mk_abs('x', mk_appl(mk_var('y'), mk_var('z'))), term);
 
         eprintln!();
         eprintln!("######## \\x.\\y.z");
         let input = "\\x.\\y.z";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(
-            Term::Abs('x', Box::new(Term::Abs('y', Box::new(Term::Var('z')),))),
-            *term
-        );
+        assert_eq!(mk_abs('x', mk_abs('y', mk_var('z'))), term);
 
         eprintln!();
         eprintln!("######## \\x.(\\y.z)");
         let input = "\\x.(\\y.z)";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(
-            Term::Abs('x', Box::new(Term::Abs('y', Box::new(Term::Var('z')),))),
-            *term
-        );
+        assert_eq!(mk_abs('x', mk_abs('y', mk_var('z'))), term);
     }
 }
