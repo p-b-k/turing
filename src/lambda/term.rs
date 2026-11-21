@@ -291,14 +291,10 @@ mod tests {
         let term = Term::parse(&input).unwrap();
         assert_eq!(_abs('x', _appl(_var('y'), _var('z'))), term);
 
-        eprintln!();
-        eprintln!("######## \\x.\\y.z");
         let input = "\\x.\\y.z";
         let term = Term::parse(&input).unwrap();
         assert_eq!(_abs('x', _abs('y', _var('z'))), term);
 
-        eprintln!();
-        eprintln!("######## \\x.(\\y.z)");
         let input = "\\x.(\\y.z)";
         let term = Term::parse(&input).unwrap();
         assert_eq!(_abs('x', _abs('y', _var('z'))), term);
@@ -307,22 +303,58 @@ mod tests {
     #[test]
     fn parse_complex_test() {
         let input = "\\x.(\\y.y(x(zz))\\z.xz)x";
+
+        #[rustfmt::skip]
+        let expected =
+            _abs(
+                'x',
+                _appl(
+                    _abs(
+                        'y',
+                        _appl(
+                            _appl(
+                                _var('y'),
+                                _appl(
+                                    _var('x'),
+                                    _appl(
+                                        _var('z'),
+                                        _var('z')))),
+                            _abs(
+                                'z',
+                                 _appl(
+                                     _var('x'),
+                                      _var('z'))),
+                        ),
+                    ),
+                    _var('x'),
+                ),
+            );
+
         let term = Term::parse(&input).unwrap();
 
-        let expected = _abs(
-            'x',
-            _appl(
-                _abs(
-                    'y',
-                    _appl(
-                        _appl(_var('y'), _appl(_var('x'), _appl(_var('z'), _var('z')))),
-                        _abs('z', _appl(_var('x'), _var('z'))),
-                    ),
-                ),
-                _var('x'),
-            ),
-        );
-
         assert_eq!(expected, term);
+    }
+
+    #[test]
+    fn parse_lecture_test() {
+        let input = "xyz";
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(_appl(_appl(_var('x'), _var('y')), _var('z')), term);
+
+        let input = "\\x.\\y.z";
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(_abs('x', _abs('y', _var('z'))), term);
+
+        let input = "\\x.yz";
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(_abs('x', _appl(_var('y'), _var('z'))), term);
+
+        let input = "y\\x.z";
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        assert_eq!(_appl(_var('y'), _abs('x', _var('z'))), term);
     }
 }
