@@ -14,6 +14,18 @@ pub enum Term {
     // Name(String), // TODO start adding name
 }
 
+pub fn _var(c: char) -> Box<Term> {
+    Box::new(Term::Var(c))
+}
+
+pub fn _abs(c: char, t: Box<Term>) -> Box<Term> {
+    Box::new(Term::Abs(c, t))
+}
+
+pub fn _appl(t1: Box<Term>, t2: Box<Term>) -> Box<Term> {
+    Box::new(Term::Appl(t1, t2))
+}
+
 // impl FromStr for Term {
 //     type Err = String;
 
@@ -79,7 +91,7 @@ fn parse_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                     // debug!( "{:20}: parse_sub_term, parse_abs returned {:?}", "parse_term", abs );
 
                     if let Option::Some(old_term) = term {
-                        term = Some(Box::new(Term::Appl(old_term, abs)));
+                        term = Some(_appl(old_term, abs));
                     } else {
                         term = Some(abs);
                     }
@@ -88,7 +100,7 @@ fn parse_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                     let sub_term = parse_sub_term(&mut tstream)?;
 
                     if let Option::Some(old_term) = term {
-                        term = Some(Box::new(Term::Appl(old_term, sub_term)));
+                        term = Some(_appl(old_term, sub_term));
                     } else {
                         term = Some(sub_term);
                     }
@@ -97,10 +109,10 @@ fn parse_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                     bail!("parse error, unexpected ')'");
                 }
                 Token::LChar(c) => {
-                    let var = Box::new(Term::Var(c.clone()));
+                    let var = _var(c.clone());
 
                     if let Option::Some(old_term) = term {
-                        term = Some(Box::new(Term::Appl(old_term, var)));
+                        term = Some(_appl(old_term, var));
                     } else {
                         term = Some(var);
                     }
@@ -135,7 +147,7 @@ fn parse_abs(tstream: &mut Iter<'_, Token>, top: bool) -> Result<Box<Term>> {
                 match c {
                     Token::LChar(ch) => {
                         // debug!( "{:20}: Returning, top = {top}, c = {ch:?}, term = {term:?}", "parse_abs" );
-                        Ok(Box::new(Term::Abs(*ch, term)))
+                        Ok(_abs(*ch, term))
                     }
                     _ => bail!("Expected lower case character"),
                 }
@@ -166,7 +178,7 @@ fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                     // debug!("{:20}: parse_abs returned {:?}", "parse_sub_term", abs);
 
                     if let Option::Some(old_term) = term {
-                        term = Some(Box::new(Term::Appl(old_term, abs)));
+                        term = Some(_appl(old_term, abs));
                     } else {
                         term = Some(abs);
                     }
@@ -177,7 +189,7 @@ fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                     let sub_term = parse_sub_term(&mut tstream)?;
 
                     if let Option::Some(old_term) = term {
-                        term = Some(Box::new(Term::Appl(old_term, sub_term)));
+                        term = Some(_appl(old_term, sub_term));
                     } else {
                         term = Some(sub_term);
                     }
@@ -187,10 +199,10 @@ fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                     break;
                 }
                 Token::LChar(c) => {
-                    let var = Box::new(Term::Var(c.clone()));
+                    let var = _var(c.clone());
 
                     if let Option::Some(old_term) = term {
-                        term = Some(Box::new(Term::Appl(old_term, var)));
+                        term = Some(_appl(old_term, var));
                     } else {
                         term = Some(var);
                     }
@@ -210,18 +222,6 @@ fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
     }
 }
 
-pub fn mk_var(c: char) -> Box<Term> {
-    Box::new(Term::Var(c))
-}
-
-pub fn mk_abs(c: char, t: Box<Term>) -> Box<Term> {
-    Box::new(Term::Abs(c, t))
-}
-
-pub fn mk_appl(t1: Box<Term>, t2: Box<Term>) -> Box<Term> {
-    Box::new(Term::Appl(t1, t2))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,91 +231,98 @@ mod tests {
         // Simple variable
         let input = "x";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(mk_var('x'), term);
+        assert_eq!(_var('x'), term);
 
         // Parenthesis get parsed out
         let input = "(x)";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(mk_var('x'), term);
+        assert_eq!(_var('x'), term);
 
         // Extra parenthesis do nothing
         let input = "((x))";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(mk_var('x'), term);
+        assert_eq!(_var('x'), term);
     }
 
     #[test]
     fn parse_appl_test() {
         let input = "xy";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(mk_appl(mk_var('x'), mk_var('y')), term);
+        assert_eq!(_appl(_var('x'), _var('y')), term);
 
         let input = "xyz";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(
-            mk_appl(mk_appl(mk_var('x'), mk_var('y')), mk_var('z')),
-            term
-        );
+        assert_eq!(_appl(_appl(_var('x'), _var('y')), _var('z')), term);
     }
 
     #[test]
     fn parse_sub_term_test() {
         let input = "(xy)";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(mk_appl(mk_var('x'), mk_var('y')), term);
+        assert_eq!(_appl(_var('x'), _var('y')), term);
 
         let input = "(xy)z";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(
-            mk_appl(mk_appl(mk_var('x'), mk_var('y')), mk_var('z')),
-            term
-        );
+        assert_eq!(_appl(_appl(_var('x'), _var('y')), _var('z')), term);
 
         let input = "((xy)z)";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(
-            mk_appl(mk_appl(mk_var('x'), mk_var('y')), mk_var('z')),
-            term
-        );
+        assert_eq!(_appl(_appl(_var('x'), _var('y')), _var('z')), term);
 
         let input = "((xy)z)y";
         let term = Term::parse(&input).unwrap();
         assert_eq!(
-            mk_appl(
-                mk_appl(mk_appl(mk_var('x'), mk_var('y')), mk_var('z')),
-                mk_var('y')
-            ),
+            _appl(_appl(_appl(_var('x'), _var('y')), _var('z')), _var('y')),
             term
         );
 
         let input = "x(yz)";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(
-            mk_appl(mk_var('x'), mk_appl(mk_var('y'), mk_var('z'))),
-            term
-        );
+        assert_eq!(_appl(_var('x'), _appl(_var('y'), _var('z'))), term);
     }
 
     #[test]
     fn parse_abs_test() {
         let input = "\\x.y";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(mk_abs('x', mk_var('y')), term);
+        assert_eq!(_abs('x', _var('y')), term);
 
         let input = "\\x.yz";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(mk_abs('x', mk_appl(mk_var('y'), mk_var('z'))), term);
+        assert_eq!(_abs('x', _appl(_var('y'), _var('z'))), term);
 
         eprintln!();
         eprintln!("######## \\x.\\y.z");
         let input = "\\x.\\y.z";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(mk_abs('x', mk_abs('y', mk_var('z'))), term);
+        assert_eq!(_abs('x', _abs('y', _var('z'))), term);
 
         eprintln!();
         eprintln!("######## \\x.(\\y.z)");
         let input = "\\x.(\\y.z)";
         let term = Term::parse(&input).unwrap();
-        assert_eq!(mk_abs('x', mk_abs('y', mk_var('z'))), term);
+        assert_eq!(_abs('x', _abs('y', _var('z'))), term);
+    }
+
+    #[test]
+    fn parse_complex_test() {
+        let input = "\\x.(\\y.y(x(zz))\\z.xz)x";
+        let term = Term::parse(&input).unwrap();
+
+        let expected = _abs(
+            'x',
+            _appl(
+                _abs(
+                    'y',
+                    _appl(
+                        _appl(_var('y'), _appl(_var('x'), _appl(_var('z'), _var('z')))),
+                        _abs('z', _appl(_var('x'), _var('z'))),
+                    ),
+                ),
+                _var('x'),
+            ),
+        );
+
+        assert_eq!(expected, term);
     }
 }
