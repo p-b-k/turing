@@ -16,11 +16,15 @@ pub enum Term {
     Var(char),
     Abs(char, Box<Term>),
     Appl(Box<Term>, Box<Term>),
-    // Name(String), // TODO start adding name
+    Name(char),
 }
 
 pub fn _var(c: char) -> Box<Term> {
     Box::new(Term::Var(c))
+}
+
+pub fn _name(c: char) -> Box<Term> {
+    Box::new(Term::Name(c))
 }
 
 pub fn _abs(c: char, t: Box<Term>) -> Box<Term> {
@@ -51,6 +55,7 @@ enum Token {
     OParen,
     CParen,
     LChar(char),
+    UChar(char),
 }
 
 impl Term {
@@ -68,6 +73,8 @@ impl Term {
                 tokens.push(Token::CParen);
             } else if c.is_ascii_lowercase() {
                 tokens.push(Token::LChar(c));
+            } else if c.is_ascii_uppercase() {
+                tokens.push(Token::UChar(c));
             } else {
                 bail!("Invalid input character: {c:?}");
             }
@@ -89,9 +96,15 @@ impl Term {
             Term::Var(x) => {
                 output.push(*x);
             }
+            Term::Name(x) => {
+                output.push(*x);
+            }
             Term::Appl(left, right) => {
                 match left.as_ref() {
                     Term::Var(c) => {
+                        output.push(*c);
+                    }
+                    Term::Name(c) => {
                         output.push(*c);
                     }
                     Term::Appl(_, _) => {
@@ -105,6 +118,9 @@ impl Term {
                 }
                 match right.as_ref() {
                     Term::Var(c) => {
+                        output.push(*c);
+                    }
+                    Term::Name(c) => {
                         output.push(*c);
                     }
                     Term::Appl(_, _) => {
@@ -126,35 +142,41 @@ impl Term {
         }
     }
 
-    pub fn exploded_print(&self) -> String {
+    pub fn explicit_print(&self) -> String {
         let mut output = String::new();
 
-        self.exploded_print_to_string(&mut output, 0, ' ');
+        self.explicit_print_to_string(&mut output);
 
         output
     }
 
-    fn exploded_print_to_string(&self, output: &mut String, depth: usize, fill: char) {
+    fn explicit_print_to_string(&self, output: &mut String) {
         match self {
-            Term::Var(c) => {
-                for _ in 0..depth {
-                    output.push(fill);
-                }
-                output.push(*c);
-                output.push('\n');
+            Term::Var(x) => {
+                output.push(*x);
             }
-            Term::Abs(c, t) => {
-                for _ in 0..depth {
-                    output.push(' ');
-                }
+            Term::Name(x) => {
+                output.push(*x);
+            }
+            Term::Appl(left, right) => {
+                output.push('(');
+                left.explicit_print_to_string(output);
+                output.push(' ');
+                right.explicit_print_to_string(output);
+                output.push(')');
+            }
+            Term::Abs(var, term) => {
                 output.push(LAMBDA_CHAR);
-                output.push(*c);
-                output.push('\n');
-                t.exploded_print_to_string(output, depth + 1, ' ');
-            }
-            Term::Appl(l, r) => {
-                l.exploded_print_to_string(output, depth + 1, '\u{2500}');
-                r.exploded_print_to_string(output, depth + 1, ' ');
+                output.push(*var);
+                output.push('.');
+                match term.as_ref() {
+                    Term::Var(_) => term.explicit_print_to_string(output),
+                    _ => {
+                        output.push('(');
+                        term.explicit_print_to_string(output);
+                        output.push(')');
+                    }
+                }
             }
         }
     }
@@ -197,12 +219,21 @@ fn parse_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                     bail!("parse error, unexpected ')'");
                 }
                 Token::LChar(c) => {
-                    let var = _var(c.clone());
+                    let var = _var(*c);
 
                     if let Option::Some(old_term) = term {
                         term = Some(_appl(old_term, var));
                     } else {
                         term = Some(var);
+                    }
+                }
+                Token::UChar(c) => {
+                    let name = _name(*c);
+
+                    if let Option::Some(old_term) = term {
+                        term = Some(_appl(old_term, name));
+                    } else {
+                        term = Some(name);
                     }
                 }
             },
@@ -287,12 +318,21 @@ fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
                     break;
                 }
                 Token::LChar(c) => {
-                    let var = _var(c.clone());
+                    let var = _var(*c);
 
                     if let Option::Some(old_term) = term {
                         term = Some(_appl(old_term, var));
                     } else {
                         term = Some(var);
+                    }
+                }
+                Token::UChar(c) => {
+                    let name = _name(*c);
+
+                    if let Option::Some(old_term) = term {
+                        term = Some(_appl(old_term, name));
+                    } else {
+                        term = Some(name);
                     }
                 }
             },
@@ -430,36 +470,71 @@ mod tests {
     }
 
     #[test]
+    fn parse_name_test() {
+        let input = "xNy";
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        println!("term  = {term}");
+        println!("also  = {}", term.explicit_print());
+        assert_eq!(_appl(_appl(_var('x'), _name('N')), _var('y')), term);
+        println!();
+
+        let input = "\\x.Ny";
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        println!("term  = {term}");
+        println!("also  = {}", term.explicit_print());
+        assert_eq!(_abs('x', _appl(_name('N'), _var('y'))), term);
+        println!();
+
+        let input = "NN";
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        println!("term  = {term}");
+        println!("also  = {}", term.explicit_print());
+        assert_eq!(_appl(_name('N'), _name('N')), term);
+        println!();
+    }
+
+    #[test]
     fn parse_lecture_test() {
         let input = "xyz";
         println!("input = {input}");
         let term = Term::parse(&input).unwrap();
-        println!("term  = {}", term.pretty_print());
+        println!("term  = {term}");
+        println!("also  = {}", term.explicit_print());
         assert_eq!(_appl(_appl(_var('x'), _var('y')), _var('z')), term);
+        println!();
 
         let input = "\\x.\\y.z";
         println!("input = {input}");
         let term = Term::parse(&input).unwrap();
-        println!("term  = {}", term.pretty_print());
+        println!("term  = {term}");
+        println!("also  = {}", term.explicit_print());
         assert_eq!(_abs('x', _abs('y', _var('z'))), term);
+        println!();
 
         let input = "\\x.yz";
         println!("input = {input}");
         let term = Term::parse(&input).unwrap();
-        println!("term  = {}", term.pretty_print());
+        println!("term  = {term}");
+        println!("also  = {}", term.explicit_print());
         assert_eq!(_abs('x', _appl(_var('y'), _var('z'))), term);
+        println!();
 
         let input = "y\\x.z";
         println!("input = {input}");
         let term = Term::parse(&input).unwrap();
-        println!("term  = {}", term.pretty_print());
+        println!("term  = {term}");
+        println!("also  = {}", term.explicit_print());
         assert_eq!(_appl(_var('y'), _abs('x', _var('z'))), term);
+        println!();
 
         let input = "(\\x.\\y.xyxz)(abc)";
         println!("input = {input}");
         let term = Term::parse(&input).unwrap();
-        println!("term  = {}", term.pretty_print());
-        // print_input_and_output(input);
+        println!("term  = {term}");
+        println!("also  = {}", term.explicit_print());
         #[rustfmt::skip]
         assert_eq!(
             _appl(
@@ -481,12 +556,13 @@ mod tests {
                     ),
                     _var('c'))),
             term);
+        println!();
 
         let input = "(\\x.(\\y.xyxz)(ab))c";
         println!("input = {input}");
         let term = Term::parse(&input).unwrap();
-        println!("term  = {}", term.pretty_print());
-        // print_input_and_output(input);
+        println!("term  = {term}");
+        println!("also  = {}", term.explicit_print());
         #[rustfmt::skip]
         assert_eq!(
             _appl(
@@ -514,20 +590,9 @@ mod tests {
                 ),
                 _var('c')),
             term);
-
-        // println!("DEMOS");
-        // print_input_and_output("(\\x.\\y.xyxz)abc");
-        // print_input_and_output("((\\x.\\y.xyxz)ab)c");
-
-        // assert_eq!(0, 1);
-    }
-
-    fn print_input_and_output(input: &str) {
-        println!("input = {input}");
-        let term = Term::parse(&input).unwrap();
-        println!("term  = {}", term.pretty_print());
-        println!("exploded:");
-        println!("{}", term.exploded_print());
         println!();
+
+        // Force failure to see output
+        // assert_eq!(0, 1);
     }
 }
