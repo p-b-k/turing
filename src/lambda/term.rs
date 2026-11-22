@@ -2,9 +2,14 @@
 // Lambda Calculus Term
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use std::slice::Iter;
+use std::{
+    fmt::{Display, Formatter, Result as FmtResult},
+    slice::Iter,
+};
 
 use color_eyre::eyre::{Result, bail};
+
+const LAMBDA_CHAR: char = '\u{03bb}';
 
 #[derive(Debug, PartialEq)]
 pub enum Term {
@@ -69,6 +74,89 @@ impl Term {
         }
 
         parse_term(&mut tokens.iter())
+    }
+
+    pub fn pretty_print(&self) -> String {
+        let mut output = String::new();
+
+        self.pretty_print_to_string(&mut output);
+
+        output
+    }
+
+    fn pretty_print_to_string(&self, output: &mut String) {
+        match self {
+            Term::Var(x) => {
+                output.push(*x);
+            }
+            Term::Appl(left, right) => {
+                match left.as_ref() {
+                    Term::Var(c) => {
+                        output.push(*c);
+                    }
+                    Term::Appl(_, _) => {
+                        left.pretty_print_to_string(output);
+                    }
+                    Term::Abs(_, _) => {
+                        output.push('(');
+                        left.pretty_print_to_string(output);
+                        output.push(')');
+                    }
+                }
+                match right.as_ref() {
+                    Term::Var(c) => {
+                        output.push(*c);
+                    }
+                    Term::Appl(_, _) => {
+                        output.push('(');
+                        right.pretty_print_to_string(output);
+                        output.push(')');
+                    }
+                    Term::Abs(_, _) => {
+                        right.pretty_print_to_string(output);
+                    }
+                }
+            }
+            Term::Abs(var, term) => {
+                output.push(LAMBDA_CHAR);
+                output.push(*var);
+                output.push('.');
+                term.pretty_print_to_string(output);
+            }
+        }
+    }
+
+    pub fn exploded_print(&self) -> String {
+        let mut output = String::new();
+
+        self.exploded_print_to_string(&mut output, 0, ' ');
+
+        output
+    }
+
+    fn exploded_print_to_string(&self, output: &mut String, depth: usize, fill: char) {
+        match self {
+            Term::Var(c) => {
+                for _ in 0..depth {
+                    output.push(fill);
+                }
+                output.push(*c);
+                output.push('\n');
+            }
+            Term::Abs(c, t) => {
+                for _ in 0..depth {
+                    output.push(' ');
+                }
+                output.push(LAMBDA_CHAR);
+                output.push(*c);
+                output.push('\n');
+                t.exploded_print_to_string(output, depth + 1, ' ');
+            }
+            Term::Appl(l, r) => {
+                l.exploded_print_to_string(output, depth + 1, '\u{2500}');
+                r.exploded_print_to_string(output, depth + 1, ' ');
+            }
+        }
     }
 }
 
@@ -222,6 +310,12 @@ fn parse_sub_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
     }
 }
 
+impl Display for Term {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{}", self.pretty_print())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -340,21 +434,100 @@ mod tests {
         let input = "xyz";
         println!("input = {input}");
         let term = Term::parse(&input).unwrap();
+        println!("term  = {}", term.pretty_print());
         assert_eq!(_appl(_appl(_var('x'), _var('y')), _var('z')), term);
 
         let input = "\\x.\\y.z";
         println!("input = {input}");
         let term = Term::parse(&input).unwrap();
+        println!("term  = {}", term.pretty_print());
         assert_eq!(_abs('x', _abs('y', _var('z'))), term);
 
         let input = "\\x.yz";
         println!("input = {input}");
         let term = Term::parse(&input).unwrap();
+        println!("term  = {}", term.pretty_print());
         assert_eq!(_abs('x', _appl(_var('y'), _var('z'))), term);
 
         let input = "y\\x.z";
         println!("input = {input}");
         let term = Term::parse(&input).unwrap();
+        println!("term  = {}", term.pretty_print());
         assert_eq!(_appl(_var('y'), _abs('x', _var('z'))), term);
+
+        let input = "(\\x.\\y.xyxz)(abc)";
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        println!("term  = {}", term.pretty_print());
+        // print_input_and_output(input);
+        #[rustfmt::skip]
+        assert_eq!(
+            _appl(
+                _abs(
+                    'x',
+                    _abs(
+                        'y',
+                        _appl(
+                            _appl(
+                                _appl(
+                                    _var('x'),
+                                    _var('y')),
+                                _var('x')),
+                            _var('z')))),
+                _appl(
+                    _appl(
+                       _var('a'),
+                       _var('b'),
+                    ),
+                    _var('c'))),
+            term);
+
+        let input = "(\\x.(\\y.xyxz)(ab))c";
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        println!("term  = {}", term.pretty_print());
+        // print_input_and_output(input);
+        #[rustfmt::skip]
+        assert_eq!(
+            _appl(
+                _abs(
+                    'x',
+                    _appl(
+                        _abs(
+                            'y',
+                            _appl(
+                                _appl(
+                                    _appl(
+                                        _var('x'),
+                                        _var('y')
+                                    ),
+                                    _var('x')
+                                ),
+                                _var('z')
+                            )
+                        ),
+                        _appl(
+                            _var('a'),
+                            _var('b')
+                        )
+                    )
+                ),
+                _var('c')),
+            term);
+
+        // println!("DEMOS");
+        // print_input_and_output("(\\x.\\y.xyxz)abc");
+        // print_input_and_output("((\\x.\\y.xyxz)ab)c");
+
+        assert_eq!(0, 1);
+    }
+
+    fn print_input_and_output(input: &str) {
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        println!("term  = {}", term.pretty_print());
+        println!("exploded:");
+        println!("{}", term.exploded_print());
+        println!();
     }
 }
