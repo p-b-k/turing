@@ -71,6 +71,8 @@ impl Term {
                 tokens.push(Token::OParen);
             } else if c == ')' {
                 tokens.push(Token::CParen);
+            } else if c.is_whitespace() {
+                // Do Nothing
             } else if c.is_ascii_lowercase() {
                 tokens.push(Token::LChar(c));
             } else if c.is_ascii_uppercase() {
@@ -254,7 +256,8 @@ fn parse_abs(tstream: &mut Iter<'_, Token>, top: bool) -> Result<Box<Term>> {
     match next {
         Option::None => bail!("Abstraction missing variable"),
         Option::Some(c) => {
-            if Option::Some(&Token::Dot) == tstream.next() {
+            let next = tstream.next();
+            if Option::Some(&Token::Dot) == next {
                 let term = if top {
                     // debug!( "{:20}: calling parse_term because top is {top}", "parse_abs" );
                     parse_term(tstream)
@@ -271,7 +274,7 @@ fn parse_abs(tstream: &mut Iter<'_, Token>, top: bool) -> Result<Box<Term>> {
                     _ => bail!("Expected lower case character"),
                 }
             } else {
-                bail!("Expected dot")
+                bail!("Expected dot, got {next:?}")
             }
         }
     }
