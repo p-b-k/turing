@@ -519,7 +519,7 @@ mod tests {
         // print_input_and_output("(\\x.\\y.xyxz)abc");
         // print_input_and_output("((\\x.\\y.xyxz)ab)c");
 
-        assert_eq!(0, 1);
+        // assert_eq!(0, 1);
     }
 
     fn print_input_and_output(input: &str) {
