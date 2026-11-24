@@ -96,14 +96,14 @@ fn main() {
     let mut cnt = 0;
     loop {
         match tape.get(&(start + cnt)) {
-            Some(c) => {
+            Option::Some(c) => {
                 if c == '1' {
                     cnt = cnt + 1;
                 } else {
                     break;
                 }
             }
-            None => break,
+            Option::None => break,
         }
     }
 

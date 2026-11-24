@@ -1,2 +1,2 @@
-T \x.\y.x
-F \x.\y.y
+T \x.\y.x  # The form of true in lambda calculus
+F \x.\y.y  # The form of false in lambda calculus

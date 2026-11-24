@@ -1,9 +1,14 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Lambda Calculus REPL Shell
+// Lambda Calculus REPL Shell main function
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use color_eyre::eyre::Result;
-use turing::lambda::dictionary::Dictionary;
+use std::env;
+
+use color_eyre::eyre::{Result, bail};
+use turing::lambda::{
+    dictionary::Dictionary,
+    shell::{AppState, start_repl_loop},
+};
 
 pub struct AppConfig {
     pub files: Vec<String>,
@@ -15,15 +20,10 @@ impl AppConfig {
     }
 }
 
-pub struct AppState {
-    pub dict: Dictionary,
-}
-
-impl AppState {
-    pub fn from_cfg(_cfg: &AppConfig) -> AppState {
-        AppState {
-            dict: Dictionary::new(),
-        }
+fn state_from_cfg(_cfg: &AppConfig) -> AppState {
+    AppState {
+        running: false,
+        dict: Dictionary::new(),
     }
 }
 
@@ -33,15 +33,29 @@ fn main() -> Result<()> {
     // Populate the config from the command line
     process_args(&mut cfg)?;
 
-    let mut state = AppState::from_cfg(&cfg);
+    let mut state = state_from_cfg(&cfg);
 
+    // Set Running to TRUE
+    state.running = true;
+
+    eprintln!("Starting REPL");
     start_repl_loop(&mut state)
 }
 
-fn process_args(_cfg: &AppConfig) -> Result<()> {
-    Ok(())
-}
+fn process_args(cfg: &mut AppConfig) -> Result<()> {
+    let args: Vec<String> = env::args().collect();
+    let mut i = 1;
 
-fn start_repl_loop(_state: &mut AppState) -> Result<()> {
+    while i < args.len() {
+        if args[i] == "--dict" {
+            i = i + 1;
+            cfg.files.push(args[i].clone());
+        } else {
+            bail!("Unknown argument {}", args[i]);
+        }
+
+        i = i + 1;
+    }
+
     Ok(())
 }

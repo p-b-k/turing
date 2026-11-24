@@ -52,6 +52,7 @@ impl Dictionary {
 
                     if line.len() > 0 {
                         // TODO Parse Line and insert def into dict
+                        println!("Read Line: {line}");
                     }
                     // let line = if l.
                 }
