@@ -2,7 +2,7 @@
 // Lambda Calculus REPL Shell logic
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{Result, bail};
 
 use clearscreen;
 use log::warn;
@@ -99,5 +99,76 @@ pub fn read_cmd(state: &AppState) -> Result<ShellCmd> {
 }
 
 fn parse_command_line(input: &str, _state: &AppState) -> Result<ShellCmd> {
-    Ok(ShellCmd::Error(format!("Unknown Command [{input}]")))
+    let tokens = split_command(input)?;
+
+    if tokens.len() == 0 {
+        Ok(ShellCmd::NoOp)
+    } else {
+        match tokens[0].as_str() {
+            _ => Ok(ShellCmd::Error(format!("Unknown Command [{input}]"))),
+        }
+    }
+}
+
+enum ParseState {
+    Token(String),
+    // TEsc(String),
+    Whitespace,
+    Quote(String),
+    // QEsc(String),
+}
+
+fn split_command(input: &str) -> Result<Vec<String>> {
+    let mut state = ParseState::Whitespace;
+    let mut tokens: Vec<String> = Vec::new();
+
+    for c in input.chars() {
+        match &mut state {
+            ParseState::Whitespace => {
+                if c.is_whitespace() {
+                    // Do Nothing
+                } else if c == '\'' {
+                    state = ParseState::Quote(String::new())
+                } else if c.is_ascii_graphic() {
+                    state = ParseState::Token(format!("{c}"));
+                } else {
+                    bail!("Invalid input character [{c:?}]");
+                }
+            }
+            ParseState::Token(s) => {
+                if c.is_whitespace() {
+                    tokens.push(s.clone());
+                    state = ParseState::Whitespace;
+                } else if c == '\'' {
+                    tokens.push(s.clone());
+                    state = ParseState::Quote(String::new())
+                } else if c.is_ascii_graphic() {
+                    s.push(c);
+                } else {
+                    bail!("Invalid input character [{c:?}]");
+                }
+            }
+            ParseState::Quote(s) => {
+                if c == '\'' {
+                    tokens.push(s.clone());
+                    state = ParseState::Whitespace;
+                } else if c.is_ascii_graphic() {
+                    s.push(c);
+                } else if c.is_whitespace() {
+                    s.push(c);
+                } else {
+                    bail!("Invalid input character [{c:?}]");
+                }
+            }
+        }
+    }
+
+    match &state {
+        ParseState::Whitespace => Ok(tokens),
+        ParseState::Token(s) => {
+            tokens.push(s.clone());
+            Ok(tokens)
+        }
+        ParseState::Quote(s) => bail!("Unclosed quoted string: [{s}]"),
+    }
 }
