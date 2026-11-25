@@ -4,15 +4,9 @@
 
 use color_eyre::eyre::{Result, bail};
 
-use clearscreen;
-use log::warn;
+use std::io::{self, Write};
 
-use std::{
-    io::{self, Write},
-    thread, time,
-};
-
-use crate::lambda::dictionary::Dictionary;
+use crate::lambda::{actions::ShellCmd, dictionary::Dictionary};
 
 pub struct AppState {
     pub running: bool,
@@ -21,50 +15,17 @@ pub struct AppState {
 
 impl AppState {}
 
-pub enum ShellCmd {
-    Exit,
-    NoOp,
-    Clear,
-    Error(String),
-    // TODO -- Add More Commands
-}
-
-impl ShellCmd {
-    pub fn execute(&self, state: &mut AppState) -> Result<()> {
-        match self {
-            Self::Exit => {
-                state.running = false;
-                Ok(())
-            }
-            Self::NoOp => {
-                // Do Nothing
-                Ok(())
-            }
-            Self::Clear => match clearscreen::clear() {
-                Err(e) => {
-                    warn!("{e}");
-                    Ok(())
-                }
-                Ok(_) => {
-                    // Do Nothing
-                    Ok(())
-                }
-            },
-            Self::Error(e) => {
-                eprintln!("Error: {e}");
-                Ok(())
-            }
-        }
-    }
-}
-
 pub fn start_repl_loop(state: &mut AppState) -> Result<()> {
     while state.running {
         print_prompt(state)?;
-        thread::sleep(time::Duration::from_secs(1));
         let cmd = read_cmd(state)?;
 
-        cmd.execute(state)?;
+        match cmd.execute(state) {
+            Err(e) => eprintln!("Failed: {e}"),
+            _ => {
+                // Do Nothing
+            }
+        }
     }
 
     println!("Exiting Cleanlhy {}", '\u{1f44d}');
@@ -83,30 +44,22 @@ pub fn read_cmd(state: &AppState) -> Result<ShellCmd> {
     // bail!("Not Implmented");
     let mut input = String::new();
 
-    io::stdin().read_line(&mut input)?;
+    let len = io::stdin().read_line(&mut input)?;
 
-    input = input.trim().to_string();
+    if len > 0 {
+        input = input.trim().to_string();
 
-    if input.len() == 0 {
-        Ok(ShellCmd::NoOp)
-    } else {
-        match input.as_str() {
-            "clear" => Ok(ShellCmd::Clear),
-            "exit" => Ok(ShellCmd::Exit),
-            _ => parse_command_line(input.as_str(), state),
+        if input.len() == 0 {
+            Ok(ShellCmd::NoOp)
+        } else {
+            match input.as_str() {
+                "clear" => Ok(ShellCmd::Clear),
+                "exit" => Ok(ShellCmd::Exit),
+                _ => parse_command_line(input.as_str(), state),
+            }
         }
-    }
-}
-
-fn parse_command_line(input: &str, _state: &AppState) -> Result<ShellCmd> {
-    let tokens = split_command(input)?;
-
-    if tokens.len() == 0 {
-        Ok(ShellCmd::NoOp)
     } else {
-        match tokens[0].as_str() {
-            _ => Ok(ShellCmd::Error(format!("Unknown Command [{input}]"))),
-        }
+        Ok(ShellCmd::Exit)
     }
 }
 
@@ -170,5 +123,18 @@ fn split_command(input: &str) -> Result<Vec<String>> {
             Ok(tokens)
         }
         ParseState::Quote(s) => bail!("Unclosed quoted string: [{s}]"),
+    }
+}
+
+fn parse_command_line(input: &str, _state: &AppState) -> Result<ShellCmd> {
+    let tokens = split_command(input)?;
+
+    if tokens.len() == 0 {
+        Ok(ShellCmd::NoOp)
+    } else {
+        match tokens[0].as_str() {
+            // "def" => Ok(ShellCmd::Action(action_define_term), CmdForm::from([ArgType::Value, ArgType::LTerm]))
+            _ => Ok(ShellCmd::Error(format!("Unknown Command [{input}]"))),
+        }
     }
 }
