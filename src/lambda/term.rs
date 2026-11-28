@@ -182,6 +182,42 @@ impl Term {
             }
         }
     }
+
+    pub fn free(&self) -> Vec<char> {
+        match self {
+            Term::Var(c) => Vec::from([*c]),
+            Term::Abs(v, t) => remove(*v, &t.free()),
+            Term::Appl(l, r) => merge(&l.free(), &r.free()),
+            Term::Name(_) => Vec::new(),
+        }
+    }
+}
+
+pub fn remove(ch: char, vars: &Vec<char>) -> Vec<char> {
+    let mut v: Vec<char> = Vec::new();
+    for c in vars {
+        if *c != ch {
+            v.push(*c);
+        }
+    }
+
+    v
+}
+
+pub fn merge(target: &Vec<char>, source: &Vec<char>) -> Vec<char> {
+    let mut v: Vec<char> = Vec::new();
+
+    for c in target {
+        v.push(*c);
+    }
+
+    for c in source {
+        if !target.contains(c) {
+            v.push(*c);
+        }
+    }
+
+    v
 }
 
 fn parse_term(mut tstream: &mut Iter<'_, Token>) -> Result<Box<Term>> {
@@ -470,6 +506,20 @@ mod tests {
         let term = Term::parse(&input).unwrap();
 
         assert_eq!(expected, term);
+    }
+
+    #[test]
+    fn parse_expr_test() {
+        let input = "\\x.x\\y.y";
+        println!("input = {input}");
+        let term = Term::parse(&input).unwrap();
+        println!("term  = {term}");
+        println!("also  = {}", term.explicit_print());
+        assert_eq!(_appl(_appl(_var('x'), _name('N')), _var('y')), term);
+        println!();
+
+        // Force failure to see output
+        // assert_eq!(0, 1);
     }
 
     #[test]

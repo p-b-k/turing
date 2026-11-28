@@ -6,7 +6,10 @@ use color_eyre::eyre::{Result, bail};
 
 use std::io::{self, Write};
 
-use crate::lambda::{actions::ShellCmd, dictionary::Dictionary};
+use crate::lambda::{
+    actions::{ShellCmd, action_list_free},
+    dictionary::Dictionary,
+};
 
 pub struct AppState {
     pub running: bool,
@@ -28,7 +31,7 @@ pub fn start_repl_loop(state: &mut AppState) -> Result<()> {
         }
     }
 
-    println!("Exiting Cleanlhy {}", '\u{1f44d}');
+    println!("{}", '\u{1f44d}');
 
     Ok(())
 }
@@ -40,8 +43,6 @@ pub fn print_prompt(_state: &AppState) -> Result<()> {
 }
 
 pub fn read_cmd(state: &AppState) -> Result<ShellCmd> {
-    // TODO
-    // bail!("Not Implmented");
     let mut input = String::new();
 
     let len = io::stdin().read_line(&mut input)?;
@@ -132,8 +133,16 @@ fn parse_command_line(input: &str, _state: &AppState) -> Result<ShellCmd> {
     if tokens.len() == 0 {
         Ok(ShellCmd::NoOp)
     } else {
+        // Get Arguments
+        let mut args: Vec<String> = Vec::new();
+
+        for x in tokens[1..].iter() {
+            args.push(x.clone());
+        }
+
         match tokens[0].as_str() {
             // "def" => Ok(ShellCmd::Action(action_define_term), CmdForm::from([ArgType::Value, ArgType::LTerm]))
+            "free" => Ok(ShellCmd::Action(action_list_free, args)),
             _ => Ok(ShellCmd::Error(format!("Unknown Command [{input}]"))),
         }
     }
